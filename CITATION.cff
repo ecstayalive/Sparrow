@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: Sparrow
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Dianyong
+    family-names: Hou
+    email: ecstayalive@163.com
+repository-code: 'https://github.com/ecstayalive/Sparrow'
+abstract: >-
+  Use the capsule network to deal with the mechanical
+  failure detection problem.
+keywords:
+  - Capsule Networks
+  - Mechanical Failure Detection
+license: Apache-2.0
+version: 1.1.0
+date-released: '2020-12-13'
