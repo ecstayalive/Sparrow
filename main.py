@@ -1,24 +1,19 @@
-"""
-程序调用入口
-
-Author: Bruce Hou, Email: ecstayalive@163.com
-"""
-
+import numpy as np
 import torch
-from CapsuleNet.CapsuleNet import *
-from CapsuleNet.Test import test
-from CapsuleNet.Train import train
-from CapsuleNet.Util.Plot import PlotData
-from CapsuleNet.Util.AddNoise import add_gaussian_noise
+from capsule_net.capsule_net import CapsuleNet
+from capsule_net.utils import add_gaussian_noise, PlotData, trainer
+from sklearn.model_selection import KFold
 
 
-def Load(train_dataset, test_dataset, batch_size=10):
-    """
-    加载数据
-    :param train_dataset:
-    :param test_dataset:
-    :param batch_size: batch size
-    :return: train_loader, test_loader
+def load_dataset(train_dataset, test_dataset, batch_size=10):
+    """加载数据
+    Args:
+        train_dataset:
+        test_dataset:
+        batch_size: batch size
+
+    Returns:
+        train_loader, test_loader
     """
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=False
@@ -30,16 +25,15 @@ def Load(train_dataset, test_dataset, batch_size=10):
     return train_loader, test_loader
 
 
-class CreDataset(torch.utils.data.Dataset):
-    """
-    创建数据集
-    """
+class VibrationDataset(torch.utils.data.Dataset):
+    """创建数据集"""
 
-    def __init__(self, data, label):
-        import numpy as np
-
-        self.data = torch.from_numpy(np.float32(data))
-        self.label = torch.from_numpy(np.int64(label))
+    def __init__(self, data: np.ndarray, label: np.ndarray, classes: int) -> None:
+        self.data = torch.unsqueeze(torch.tensor(data), 1)
+        label = torch.tensor(label)
+        self.label = torch.zeros(label.shape[0], classes).scatter_(
+            -1, label.view(-1, 1), 1.0
+        )
 
     def __len__(self):
         return int(self.data.shape[0])
@@ -49,45 +43,52 @@ class CreDataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    import numpy as np
-    from sklearn.model_selection import KFold
-
-    # load data
-    data, label = np.load("Dataset/train.npy"), np.load("Dataset/label.npy")
-    # data = add_gaussian_noise(data, 1)
+    ########################################################################
+    # User-code
+    data, label = np.load("dataset/train.npy"), np.load("dataset/label.npy")
+    classes = 8
+    # User-code
+    ########################################################################
+    # process the data and the label
+    data = np.float32(data)
+    # add noise to signal
+    # data = add_gaussian_noise(data, 1.0)
+    label = np.int64(label)
+    signal_length = data.shape[1]
     # Plot data
-    plotdata = PlotData()
-    # for example
-    plotdata.plot_signal(data[0]) # plot an orginal signal
-    plotdata.plot_signalByFFT(data[0])  # plot an signal after fft process
-    plotdata.plot_spectrogram(data[0]) # plot a spectrogram of the signal
-    plotdata.plot_inputImage(data[0])  # plot an input image
+    plot_data = PlotData()
+    # plot an original signal
+    plot_data.plot_signal(data[0])
+    # plot an signal after fft process
+    plot_data.plot_fft_signal(data[0])
+    # plot a spectrogram of the signal
+    plot_data.plot_spectrogram(data[0])
 
-    print("train.shape:", data.shape)
-    print("label.shape:", label.shape)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # 四折交叉验证
     kf = KFold(n_splits=4)
-    count = 0
-    for train_index, test_index in kf.split(data):
+    for id, (train_index, test_index) in enumerate(kf.split(data)):
         # 生成数据集
         train_data = data[train_index]
         train_label = label[train_index]
         test_data = data[test_index]
         test_label = label[test_index]
         # 建立数据集合
-        train_dataset = CreDataset(train_data, train_label)
-        test_dataset = CreDataset(test_data, test_label)
-        train_loader, test_loader = Load(train_dataset, test_dataset, batch_size=10)
-
+        train_dataset = VibrationDataset(train_data, train_label, classes)
+        test_dataset = VibrationDataset(test_data, test_label, classes)
+        train_loader, test_loader = load_dataset(
+            train_dataset, test_dataset, batch_size=12
+        )
         # 创建模型
-        model = CapsuleNet(input_size=[1, 4096], classes=8, routings=3)
+        model = CapsuleNet(
+            input_features=(1, signal_length),
+            classes=classes,
+            routings=3,
+            device=device,
+        )
         print(model)
-        model.cuda()
         # 训练
-        train(model, train_loader, test_loader, count, 30)
-        count += 1
-
-    
+        trainer(model, train_loader, test_loader, 15, id, device)
     # plot accuracy and loss
-    plotdata.plot_log()
+    plot_data.plot_log()

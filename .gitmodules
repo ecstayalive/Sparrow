@@ -1,0 +1,3 @@
+[submodule "capsule_nn"]
+	path = capsule_nn
+	url = https://github.com/ecstayalive/capsule_nn
