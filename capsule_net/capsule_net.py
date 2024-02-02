@@ -60,8 +60,7 @@ class CapsuleNet(nn.Module):
                 torch.zeros(1, *input_features, device=device)
             )
             feature = torch.cat((feature1, feature2), dim=-2)
-            digit_caps_in_shape = self.primary_caps(feature).shape[1:]
-
+            digit_caps_in_shape = tuple(self.primary_caps(feature).shape[1:])
 
         # Capsule layer. Routing algorithm works here.
         self.digit_caps = CapsLinear(
